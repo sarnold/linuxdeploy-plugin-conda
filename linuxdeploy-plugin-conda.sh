@@ -17,6 +17,7 @@ show_usage() {
     echo "Variables:"
     echo "  CONDA_CHANNELS=\"channelA;channelB;...\""
     echo "  CONDA_PACKAGES=\"packageA;packageB;...\""
+    echo "  CONDA_ENVIRONMENT=\"path/to/environment.yml\""
     echo "  CONDA_PYTHON_VERSION=\"3.6\""
     echo "  PIP_REQUIREMENTS=\"packageA packageB -r requirements.txt -e git+https://...\""
     echo "  PIP_PREFIX=\"AppDir/usr/share/conda\""
@@ -69,6 +70,14 @@ fi
 
 mkdir -p "$APPDIR"
 
+if [ "$CONDA_ENVIRONMENT" == "" ]; then
+    log "WARNING: \$CONDA_ENVIRONMENT not set, no user environment created!"
+else
+    export CONDA_ENV_NAME=$(grep name $CONDA_ENVIRONMENT | cut -d" " -f2)
+    if [ "$CONDA_ENV_NAME" == "" ]; then
+        log "WARNING: \$CONDA_ENV_NAME not set, build will most likely fail!"
+    fi
+fi
 if [ "$CONDA_PACKAGES" == "" ]; then
     log "WARNING: \$CONDA_PACKAGES not set, no packages will be installed!"
 fi
@@ -139,25 +148,27 @@ export HOME=$(readlink -f _temp_home)
 # conda-forge is used by many conda packages, therefore we'll add that channel by default
 conda config --add channels conda-forge
 
-# force-install libxi, required by a majority of packages on some more annoying distributions like e.g., Arch
-#conda install -y xorg-libxi
-
 # force another python version if requested
 if [ "$CONDA_PYTHON_VERSION" != "" ]; then
     conda install -y python="$CONDA_PYTHON_VERSION"
 fi
 
-# add channels specified via $CONDA_CHANNELS
-IFS=';' read -ra chans <<< "$CONDA_CHANNELS"
-for chan in "${chans[@]}"; do
-    conda config --append channels "$chan"
-done
+if [ "$CONDA_ENVIRONMENT" == "" ]; then
+    # add channels specified via $CONDA_CHANNELS
+    IFS=';' read -ra chans <<< "$CONDA_CHANNELS"
+    for chan in "${chans[@]}"; do
+        conda config --append channels "$chan"
+    done
 
-# install packages specified via $CONDA_PACKAGES
-IFS=';' read -ra pkgs <<< "$CONDA_PACKAGES"
-for pkg in "${pkgs[@]}"; do
-    conda install -y "$pkg"
-done
+    # install packages specified via $CONDA_PACKAGES
+    IFS=';' read -ra pkgs <<< "$CONDA_PACKAGES"
+    for pkg in "${pkgs[@]}"; do
+        conda install -y "$pkg"
+    done
+else
+    conda env create -f "$CONDA_ENVIRONMENT"
+    conda activate "$CONDA_ENV_NAME"
+fi
 
 # make sure pip is up to date
 pip install -U pip
