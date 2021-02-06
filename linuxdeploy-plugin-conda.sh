@@ -153,22 +153,22 @@ if [ "$CONDA_PYTHON_VERSION" != "" ]; then
     conda install -y python="$CONDA_PYTHON_VERSION"
 fi
 
-if [ "$CONDA_ENVIRONMENT" == "" ]; then
-    # add channels specified via $CONDA_CHANNELS
-    IFS=';' read -ra chans <<< "$CONDA_CHANNELS"
-    for chan in "${chans[@]}"; do
-        conda config --append channels "$chan"
-    done
-
-    # install packages specified via $CONDA_PACKAGES
-    IFS=';' read -ra pkgs <<< "$CONDA_PACKAGES"
-    for pkg in "${pkgs[@]}"; do
-        conda install -y "$pkg"
-    done
-else
+if [ "$CONDA_ENVIRONMENT" != "" ]; then
     conda env create -f "$CONDA_ENVIRONMENT"
     conda activate "$CONDA_ENV_NAME"
 fi
+
+# add channels specified via $CONDA_CHANNELS
+IFS=';' read -ra chans <<< "$CONDA_CHANNELS"
+for chan in "${chans[@]}"; do
+    conda config --append channels "$chan"
+done
+
+# install packages specified via $CONDA_PACKAGES
+IFS=';' read -ra pkgs <<< "$CONDA_PACKAGES"
+for pkg in "${pkgs[@]}"; do
+    conda install -y "$pkg"
+done
 
 # make sure pip is up to date
 pip install -U pip
@@ -184,6 +184,15 @@ if [ "$PIP_REQUIREMENTS" != "" ]; then
     if [ "$PIP_WORKDIR" != "" ]; then
         popd
     fi
+fi
+
+if [ "$CONDA_ENVIRONMENT" != "" ]; then
+    pushd "$APPDIR"
+    mv usr/conda/envs/"$CONDA_ENV_NAME" .
+    rm -rf usr/conda/*
+    mv "$CONDA_ENV_NAME"/* usr/conda/
+    rmdir "$CONDA_ENV_NAME"
+    popd
 fi
 
 # create symlinks for all binaries in usr/conda/bin/ in usr/bin/
